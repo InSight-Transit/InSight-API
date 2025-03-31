@@ -2,3 +2,4 @@ test-functions.py
 img1.jpg
 img2.jpg
 __pycache__
+.env
