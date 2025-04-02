@@ -5,6 +5,7 @@ from pymongo.server_api import ServerApi
 import sys
 import os
 from dotenv import load_dotenv
+import json
 
 load_dotenv()
 
@@ -92,5 +93,10 @@ result = client['insight']['facedata'].aggregate([
         }
     }
 ])
+result = list(result)
 
-print(list(result))
+
+print("ID Number")
+print(result[0]['cond'])
+
+
