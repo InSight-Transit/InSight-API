@@ -8,6 +8,7 @@ import os
 from dotenv import load_dotenv
 import json
 import tempfile
+from fastapi.middleware.cors import CORSMiddleware
 
 
 
@@ -16,7 +17,16 @@ uri = os.getenv('URI')
 client = MongoClient(uri, server_api=ServerApi('1'))
 db = client["insight"]
 collection = db["facedata"]
+
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods (GET, POST, etc.)
+    allow_headers=["*"],  # Allows all headers
+)
 
 @app.get('/')
 async def hello_world():
@@ -141,4 +151,7 @@ async def searchfaces(file : UploadFile):
     ])
     result = list(result)
 
-    return {'Account ID' : result[0]['_id']}
+    if len(result) > 0:
+        return {'Account ID' : result[0]['_id']}
+    else:
+        return {'error' : 'No accounts connected to this face.'}
