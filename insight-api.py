@@ -1,15 +1,14 @@
 from fastapi import FastAPI, File, UploadFile, Form
+from fastapi.middleware.cors import CORSMiddleware
 from deepface import DeepFace
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 from io import BytesIO
+import tempfile
 import sys
 import os
 from dotenv import load_dotenv
 import json
-import tempfile
-from fastapi.middleware.cors import CORSMiddleware
-
 
 
 load_dotenv()
