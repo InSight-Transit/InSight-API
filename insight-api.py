@@ -27,13 +27,8 @@ app.add_middleware(
     allow_headers=["*"],  # Allows all headers
 )
 
-@app.get('/')
-async def hello_world():
-    result = DeepFace.verify(img1_path = "img1.jpg", img2_path = "img2.jpg")
-    return {'Result' : result.verified}
-
 @app.post('/api/addface')
-async def addface(user_id : int = Form(...), file: UploadFile = File(...)):
+async def addface(user_id : str = Form(...), file: UploadFile = File(...)):
     if file.content_type not in ['image/jpeg', 'image/png']:
         return {"error": "File type not supported. Please upload a JPEG or PNG image."}
     
@@ -53,7 +48,7 @@ async def addface(user_id : int = Form(...), file: UploadFile = File(...)):
     return {'Message' : 'Face successfully added'}
 
 @app.post('/api/deletefacedata')
-async def deleteface(user_id : int = Form(...)):
+async def deleteface(user_id : str = Form(...)):
     result = collection.delete_many({
         'user_id': user_id
     })
