@@ -6,3 +6,4 @@ env
 .venv
 venv
 .env
+insight-firebase.json

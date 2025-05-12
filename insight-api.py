@@ -10,9 +10,14 @@ import os
 from dotenv import load_dotenv
 import json
 from datetime import datetime
-
+from google.cloud import firestore
+from firebase_admin import credentials, initialize_app
 
 load_dotenv()
+cred = credentials.Certificate("./insight-firebase.json")
+initialize_app(cred)
+fs = firestore.Client()
+
 uri = os.getenv('URI')
 client = MongoClient(uri, server_api=ServerApi('1'))
 db = client["insight"]
@@ -255,13 +260,30 @@ async def payFare(file: UploadFile):
 
         if last_transaction:
             time_difference = current_time - last_transaction
-            if time_difference.total_seconds() / 3600 < 3:
+            if time_difference.total_seconds() / 3600 < 0.0000001:
                 return {'Message': 'Face scan performed before 3 hour time period ended. No fare charged.', 'Time Difference': time_difference.total_seconds()}
+
+        doc_ref = fs.collection("users").document(user_id)
+        doc = doc_ref.get()
+
+        if not doc.exists:
+            return {'error': f'No user found with ID: {user_id}'}
+
+        user_data = doc.to_dict()
+        balance = user_data.get('balance', 0)
+
+        if balance < 2.50:
+            return {'Message': 'Insufficient balance.', 'Balance': user_data}
+
+        new_balance = balance - 2.50
+        doc_ref.update({'balance': new_balance})
 
         collection.update_one(
             {'user_id': user_id},
             {'$set': {'last_transaction': current_time}}
         )
+
         return {'Account ID': user_id, 'Message': 'Time updated and fare charged.', 'Time Difference': time_difference.total_seconds()}
     else:
         return {'error': 'No accounts connected to this face.'}
+    
