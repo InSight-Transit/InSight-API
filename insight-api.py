@@ -9,6 +9,7 @@ import sys
 import os
 from dotenv import load_dotenv
 import json
+from datetime import datetime
 
 
 load_dotenv()
@@ -149,3 +150,118 @@ async def searchfaces(file : UploadFile):
         return {'Account ID' : result[0]['_id']}
     else:
         return {'error' : 'No accounts connected to this face.'}
+
+@app.post('/api/payfare')
+async def payFare(file: UploadFile):
+    if file.content_type not in ['image/jpeg', 'image/png']:
+        return {"error": "File type not supported. Please upload a JPEG or PNG image."}
+    
+    img_content = await file.read()
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_file:
+        temp_file.write(img_content)
+        temp_file_path = temp_file.name
+
+    embedding_objs = DeepFace.represent(
+        img_path=temp_file_path, model_name="Facenet", detector_backend="mtcnn"
+    )
+    embedding = embedding_objs[0]["embedding"]
+
+    current_time = datetime.utcnow()
+
+    result = client['insight']['facedata'].aggregate([
+        {
+            '$addFields': {
+                'target_embedding': embedding
+            }
+        }, {
+            '$unwind': {
+                'path': '$embedding',
+                'includeArrayIndex': 'embedding_index'
+            }
+        }, {
+            '$unwind': {
+                'path': '$target_embedding',
+                'includeArrayIndex': 'target_embedding_index'
+            }
+        }, {
+            '$project': {
+                'user_id': 1,
+                'embedding': 1,
+                'target_embedding': 1,
+                'compare': {
+                    '$cmp': [
+                        '$target_embedding_index', '$embedding_index'
+                    ]
+                },
+                'last_transaction': 1
+            }
+        }, {
+            '$match': {
+                'compare': 0
+            }
+        }, {
+            '$group': {
+                '_id': '$user_id',
+                'distance': {
+                    '$sum': {
+                        '$pow': [
+                            {
+                                '$subtract': [
+                                    '$embedding', '$target_embedding'
+                                ]
+                            }, 2
+                        ]
+                    }
+                },
+                'last_transaction': {'$first': '$last_transaction'}
+            }
+        }, {
+            '$project': {
+                '_id': 1,
+                'distance': {
+                    '$sqrt': '$distance'
+                },
+                'last_transaction': 1
+            }
+        }, {
+            '$project': {
+                '_id': 1,
+                'distance': 1,
+                'last_transaction': 1,
+                'cond': {
+                    '$lte': [
+                        '$distance', 10
+                    ]
+                },
+            }
+        }, {
+            '$match': {
+                'cond': True
+            }
+        }, {
+            '$sort': {
+                'distance': 1
+            }
+        }
+    ])
+    result = list(result)
+
+    if len(result) > 0:
+        user_id = result[0]['_id']
+        last_transaction = result[0].get('last_transaction')
+
+        time_difference = None
+
+        if last_transaction:
+            time_difference = current_time - last_transaction
+            if time_difference.total_seconds() / 3600 < 3:
+                return {'Message': 'Face scan performed before 3 hour time period ended. No fare charged.', 'Time Difference': time_difference.total_seconds()}
+
+        collection.update_one(
+            {'user_id': user_id},
+            {'$set': {'last_transaction': current_time}}
+        )
+        return {'Account ID': user_id, 'Message': 'Time updated and fare charged.', 'Time Difference': time_difference.total_seconds()}
+    else:
+        return {'error': 'No accounts connected to this face.'}
