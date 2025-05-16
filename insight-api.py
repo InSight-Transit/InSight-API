@@ -260,7 +260,7 @@ async def payFare(file: UploadFile):
 
         if last_transaction:
             time_difference = current_time - last_transaction
-            if time_difference.total_seconds() / 3600 < 0.00001:
+            if time_difference.total_seconds() < 30:
                 return {'Message': 'Face scan performed before 3 hour time period ended. No fare charged.', 'Time Difference': time_difference.total_seconds()}
 
         doc_ref = fs.collection("users").document(user_id)
